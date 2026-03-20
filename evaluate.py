@@ -3,57 +3,93 @@ import yaml
 import matplotlib.pyplot as plt
 import os
 import argparse
+import json
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--multi-seed', action='store_true', help='Evaluate multi-seed results')
+    return parser.parse_args()
 
 def plot_metrics(args):
     os.makedirs('results/plots', exist_ok=True)
     
-    # Mock evaluation routine based on trained weights
-    algorithms = ['higat_masac', 'random', 'greedy']
+    algorithms = ['higat_masac', 'mappo', 'maddpg', 'gnn_ddqn', 'random', 'greedy']
     
-    delay = [12.4, 55.2, 34.1]
-    energy = [4.2, 12.3, 8.5]
-    throughput = [85.5, 30.1, 55.4]
+    delay_means = []
+    delay_stds = []
+    energy_means = []
+    energy_stds = []
+    throughput_means = []
+    throughput_stds = []
     
+    seeds = [42, 43, 44] if args.multi_seed else [42]
+    
+    with open('results/evaluation_report.txt', 'w') as report:
+        report.write("HiGAT-MASAC Evaluation Results (Multi-Seed)\n")
+        report.write("===========================================\n")
+        
+        for algo in algorithms:
+            d_vals, e_vals, t_vals = [], [], []
+            for seed in seeds:
+                filepath = f'results/{algo}_seed_{seed}_metrics.json'
+                if os.path.exists(filepath):
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                    d_vals.append(data['delay'])
+                    e_vals.append(data['energy'])
+                    t_vals.append(data['throughput'])
+            
+            if len(d_vals) > 0:
+                d_m, d_s = np.mean(d_vals), np.std(d_vals)
+                e_m, e_s = np.mean(e_vals), np.std(e_vals)
+                t_m, t_s = np.mean(t_vals), np.std(t_vals)
+            else:
+                d_m, d_s = 0.0, 0.0
+                e_m, e_s = 0.0, 0.0
+                t_m, t_s = 0.0, 0.0
+                
+            delay_means.append(d_m)
+            delay_stds.append(d_s)
+            energy_means.append(e_m)
+            energy_stds.append(e_s)
+            throughput_means.append(t_m)
+            throughput_stds.append(t_s)
+            
+            report.write(f"Algorithm: {algo}\n")
+            report.write(f"  Avg Delay: {d_m:.2f} ± {d_s:.2f} ms\n")
+            report.write(f"  Total Energy: {e_m:.2f} ± {e_s:.2f} J\n")
+            report.write(f"  Sum Throughput: {t_m:.2f} ± {t_s:.2f} Mbps\n\n")
+
     x = np.arange(len(algorithms))
     width = 0.25
     
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     
-    ax1.bar(x - width, delay, width, label='Delay (ms)', color='tab:red')
-    ax1.set_ylabel('Delay (ms)', color='tab:red')
-    ax1.tick_params(axis='y', labelcolor='tab:red')
+    ax[0].bar(x, delay_means, width, yerr=delay_stds, capsize=5, color='orange')
+    ax[0].set_title('Average Completion Delay')
+    ax[0].set_xticks(x)
+    ax[0].set_xticklabels(algorithms, rotation=45)
+    ax[0].set_ylabel('ms')
     
-    ax2 = ax1.twinx()
-    ax2.bar(x, energy, width, label='Energy (J)', color='tab:blue')
-    ax2.set_ylabel('Energy (J)', color='tab:blue')
-    ax2.tick_params(axis='y', labelcolor='tab:blue')
+    ax[1].bar(x, energy_means, width, yerr=energy_stds, capsize=5, color='green')
+    ax[1].set_title('Total System Energy')
+    ax[1].set_xticks(x)
+    ax[1].set_xticklabels(algorithms, rotation=45)
+    ax[1].set_ylabel('Joules')
     
-    ax3 = ax1.twinx()
-    ax3.spines['right'].set_position(('outward', 60))
-    ax3.bar(x + width, throughput, width, label='Throughput (Mbps)', color='tab:green')
-    ax3.set_ylabel('Throughput (Mbps)', color='tab:green')
-    ax3.tick_params(axis='y', labelcolor='tab:green')
+    ax[2].bar(x, throughput_means, width, yerr=throughput_stds, capsize=5, color='blue')
+    ax[2].set_title('V2I Sum-Rate Capacity')
+    ax[2].set_xticks(x)
+    ax[2].set_xticklabels(algorithms, rotation=45)
+    ax[2].set_ylabel('Mbps')
     
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(algorithms)
-    ax1.set_title('Primary Metrics Comparison')
-    
-    fig.tight_layout()
+    plt.tight_layout()
     plt.savefig('results/plots/primary_metrics.png')
+    plt.close()
     
-    # Text output
-    with open('results/evaluation_report.txt', 'w') as f:
-        f.write("HiGAT-MASAC Evaluation Results\n")
-        f.write("==============================\n")
-        for i, algo in enumerate(algorithms):
-            f.write(f"Algorithm: {algo}\n")
-            f.write(f"  Avg Delay: {delay[i]} ms\n")
-            f.write(f"  Total Energy: {energy[i]} J\n")
-            f.write(f"  Sum Throughput: {throughput[i]} Mbps\n\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
+    args = parse_args()
     
     print("Running evaluation plotting...")
     plot_metrics(args)

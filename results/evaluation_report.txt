@@ -1,0 +1,32 @@
+HiGAT-MASAC Evaluation Results (Multi-Seed)
+===========================================
+Algorithm: higat_masac
+  Avg Delay: 1090097865286.82 ± 1462888994523.44 ms
+  Total Energy: 809167.67 ± 625892.84 J
+  Sum Throughput: 71.33 ± 1.98 Mbps
+
+Algorithm: mappo
+  Avg Delay: 1802247084324.67 ± 31369566881.29 ms
+  Total Energy: 16769619.20 ± 16882277.44 J
+  Sum Throughput: 72.90 ± 0.88 Mbps
+
+Algorithm: maddpg
+  Avg Delay: 1200652364714.09 ± 153249132836.56 ms
+  Total Energy: 11517174.60 ± 5723781.04 J
+  Sum Throughput: 56.43 ± 3.10 Mbps
+
+Algorithm: gnn_ddqn
+  Avg Delay: 1204948388809.30 ± 169092893.45 ms
+  Total Energy: 130777.67 ± 40283.77 J
+  Sum Throughput: 72.52 ± 0.97 Mbps
+
+Algorithm: random
+  Avg Delay: 4659308929923.63 ± 0.00 ms
+  Total Energy: 6362490.18 ± 0.00 J
+  Sum Throughput: 68.40 ± 0.00 Mbps
+
+Algorithm: greedy
+  Avg Delay: 2407619675941.36 ± 0.00 ms
+  Total Energy: 12124645.30 ± 0.00 J
+  Sum Throughput: 67.47 ± 0.00 Mbps
+
