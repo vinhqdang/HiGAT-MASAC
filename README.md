@@ -2,25 +2,54 @@
 
 Hierarchical Graph Attention Multi-Agent Soft Actor-Critic for Joint Resource Optimization in B5G Vehicular Networks.
 
-## Setup
+## Research Context
+Urban vehicular networks in the B5G/6G era must simultaneously satisfy three tightly coupled resource demands: spectrum efficiency, energy efficiency, and computation offloading. This project implements a hierarchical MARL architecture using GAT to encode interference topology and continuous/hybrid SAC algorithms to allocate power, spectrum subbands, and computational MEC resources.
+
+## Project Structure
+- `env/`: Vehicular Environment (Channel, Task generation, Manhattan Mobility)
+- `models/`: PyTorch modules (GAT Encoder, Micro SAC, Macro SAC, HiGAT MASAC Integrator)
+- `baselines/`: Benchmark models (Random, Greedy)
+- `configs/`: YAML Configuration parameters for the RL pipeline
+- `results/`: Training artifacts, metrics, and plots
+
+## Environment Setup
+It is recommended to run this project in a Conda environment containing PyTorch, Gymnasium, and PyTorch Geometric.
+
 ```bash
-conda create -n py313 python=3.13
+conda create -n py313 python=3.13 -y
 conda activate py313
 pip install -r requirements.txt
 ```
 
-## Running
-Test environment:
+## Running the Pipeline
+
+### Testing the Environment
+To verify that the environment runs without any tensor shape anomalies or logical errors:
 ```bash
 python train.py --test-env
 ```
 
-To run training dummy loop (2 episodes):
+### Fast Dummy Run
+To run a fast pipeline verification (2 episodes, small lengths) to ensure Neural Networks compute gradients properly:
 ```bash
 python train.py --dummy-run
 ```
 
-To evaluate and plot results:
+### Full Training
+To run the full algorithm (configured by `configs/default.yaml`):
+```bash
+# HiGAT-MASAC Proposed Algorithm
+python train.py --algo higat_masac
+
+# Random Baseline
+python train.py --algo random
+
+# Greedy Baseline
+python train.py --algo greedy
+```
+
+### Evaluation
+After results are saved in `results/`, generate the comparative graphs:
 ```bash
 python evaluate.py
 ```
