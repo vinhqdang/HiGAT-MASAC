@@ -1,0 +1,58 @@
+# configs/default.yaml
+# HiGAT-MASAC Default Configuration
+
+env:
+  num_rsus: 4
+  num_vehicles: 50
+  num_subbands: 10
+  subband_bandwidth_mhz: 1.0 # B
+  max_tx_power_dbm: 23 # P_max
+  noise_power_dbm: -114 # σ²
+  rsu_mec_capacity_ghz: 20.0 # F_mec
+  vehicle_cpu_capacity_ghz: 1.0 # f_loc
+  max_delay_ms: 100 # T_max
+  sim_duration_s: 600
+  grid_size_blocks: 3 # 3x3 blocks, 250m each
+  block_length_m: 250
+  lane_width_m: 3.5
+  num_lanes: 3
+  
+  # Task generation
+  task_data_mbits_min: 0.5
+  task_data_mbits_max: 2.0
+  task_cpu_cycles_per_bit_min: 500
+  task_cpu_cycles_per_bit_max: 1500
+  
+  # Channel
+  shadowing_std_db: 4.0
+  d_int_m: 150.0 # macro graph edge threshold
+  
+  # Objectives
+  w1: 0.4 # delay weight
+  w2: 0.3 # energy weight
+  w3: 0.3 # throughput weight
+  w_vio: 1.0 # penalty for delay violation
+
+rl:
+  buffer_size: 100000
+  batch_size: 256
+  gamma: 0.99
+  actor_lr: 0.0003
+  critic_lr: 0.0003
+  tau: 0.005 # Soft target update
+  
+  # GAT parameters
+  gat_heads: 4
+  gat_embed_dim: 64
+  gat_layers: 2
+  
+  # Timing scales
+  macro_slot_duration_ms: 100
+  micro_slot_duration_ms: 10
+  
+  # Training params
+  training_episodes: 2000
+  eval_interval: 50
+  
+  # KD params
+  t_kd_episodes: 5
