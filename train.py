@@ -24,11 +24,36 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=42, help='Random seed for experiment')
     parser.add_argument('--test-env', action='store_true', help='Test environment step logic without training')
     parser.add_argument('--dummy-run', action='store_true', help='Test 2 episodes only for pipeline verification')
+    parser.add_argument('--override', nargs='*', default=[], help='Config overrides in format section.key=value, e.g. env.num_vehicles=20')
+    parser.add_argument('--out-prefix', type=str, default='', help='Prefix for output result files, e.g. scenario_s2')
     return parser.parse_args()
+
+def apply_overrides(config, overrides):
+    """Apply key=value overrides in format 'section.key=value'."""
+    for override in overrides:
+        key_path, value = override.split('=')
+        parts = key_path.split('.')
+        d = config
+        for part in parts[:-1]:
+            d = d[part]
+        # Auto-cast to int/float if possible
+        try:
+            value = int(value)
+        except ValueError:
+            try:
+                value = float(value)
+            except ValueError:
+                pass  # keep as string
+        d[parts[-1]] = value
+    return config
 
 def train(args):
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
+    
+    # Apply any CLI overrides
+    if hasattr(args, 'override') and args.override:
+        config = apply_overrides(config, args.override)
         
     env = VehicularEnv(config)
     
@@ -185,7 +210,9 @@ def train(args):
     avg_throughput = np.mean(metrics_history['throughput'][-3:])
     
     os.makedirs('results', exist_ok=True)
-    with open(f'results/{args.algo}_seed_{args.seed}_metrics.json', 'w') as f:
+    prefix = getattr(args, 'out_prefix', '') or ''
+    tag = f"{prefix}_{args.algo}_seed_{args.seed}" if prefix else f"{args.algo}_seed_{args.seed}"
+    with open(f'results/{tag}_metrics.json', 'w') as f:
         json.dump({
             'delay': float(avg_delay),
             'energy': float(avg_energy),
