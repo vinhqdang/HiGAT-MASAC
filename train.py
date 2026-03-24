@@ -96,25 +96,10 @@ def train(args):
             # 1. Macro tier execution
             macro_actions = {'subbands': [], 'f_mec_allocated': []}
             
-            # Since macro_state is a list of graphs (one per RSU), we iterate or batch
-            # For simplicity, we assume central or batched decision.
-            # We'll mock the graph input logic here. In practice, map features to edge_index and call network.
-            
-            # Mock generating states as dummy tensors for the agent just to verify pipeline shape compilation
-            # In a real run, construct Torch Geometric Data objects from macro_state list.
-            for m in range(env.num_rsus):
-                pass
-                
-            # Assume we got actions from macro agent
             if args.algo == 'higat_masac':
-                # Dummy tensors for compilation validation
-                dummy_macro = (torch.zeros((env.num_vehicles, 5)), torch.zeros((2, 0), dtype=torch.long), None, torch.zeros(env.num_vehicles, dtype=torch.long)) 
-                subband, fmec = agent.select_macro_action(dummy_macro)
+                subband, fmec = agent.select_macro_action(macro_state)
             elif args.algo in ['mappo', 'maddpg', 'gnn_ddqn']:
-                # The baselines currently use random/mock logic extracting from macro_state
-                # GNN-DDQN expects a state graph like HiGAT_MASAC
-                dummy_macro = (torch.zeros((env.num_vehicles, 5)), torch.zeros((2, 0), dtype=torch.long), None, torch.zeros(env.num_vehicles, dtype=torch.long)) 
-                subband, fmec = agent.select_macro_action(dummy_macro if args.algo == 'gnn_ddqn' else macro_state)
+                subband, fmec = agent.select_macro_action(macro_state)
             elif args.algo == 'random':
                 subband, fmec = agent.select_macro_action_random(macro_state)
             elif args.algo == 'greedy':
@@ -130,26 +115,26 @@ def train(args):
                 p_tx = np.zeros((env.num_vehicles, env.K))
                 alpha = np.zeros(env.num_vehicles)
                 
-                # Each vehicle decides its micro action
-                for n in range(env.num_vehicles):
-                    if args.algo == 'higat_masac':
-                        dummy_micro = (torch.zeros((1, 4)), torch.zeros((2, 0), dtype=torch.long), None, torch.zeros(1, dtype=torch.long))
-                        action = agent.select_micro_action(dummy_micro)
-                        # action is [p_tx_scalar, alpha_scalar]
-                        p_val, alpha_val = action
-                        # map back from [-1, 1] to [0, max]
-                        alpha[n] = (alpha_val + 1) / 2.0
-                        p_tx[n, np.argmax(subband[n])] = (p_val + 1) / 2.0 * env.max_tx_power
-                    elif args.algo in ['mappo', 'maddpg', 'gnn_ddqn']:
-                        dummy_micro = (torch.zeros((1, 4)), torch.zeros((2, 0), dtype=torch.long), None, torch.zeros(1, dtype=torch.long))
-                        action = agent.select_micro_action(dummy_micro if args.algo == 'gnn_ddqn' else micro_state_list)
-                        p_val, alpha_val = action
-                        alpha[n] = (alpha_val + 1) / 2.0 if alpha_val is not None else 0.5
-                        p_tx[n, np.argmax(subband[n])] = (p_val + 1) / 2.0 * env.max_tx_power if p_val is not None else 0.5 * env.max_tx_power
-                    else:
-                        act = agent.select_micro_action_random(micro_state_list) if args.algo == 'random' else agent.select_micro_action_greedy(micro_state_list)
-                        alpha[n] = act[1]
-                        p_tx[n, np.argmax(subband[n])] = act[0] * env.max_tx_power
+                if args.algo == 'higat_masac':
+                    action = agent.select_micro_action(micro_state_list)
+                    # action is [p_tx_scalar, alpha_scalar] (N, 2)
+                    p_val = action[:, 0]
+                    alpha_val = action[:, 1]
+                    alpha = (alpha_val + 1) / 2.0
+                    chosen_subbands = np.argmax(subband, axis=1)
+                    p_tx[np.arange(env.num_vehicles), chosen_subbands] = (p_val + 1) / 2.0 * env.max_tx_power
+                else:    
+                    # Each vehicle decides its micro action
+                    for n in range(env.num_vehicles):
+                        if args.algo in ['mappo', 'maddpg', 'gnn_ddqn']:
+                            action = agent.select_micro_action(micro_state_list)
+                            p_v, a_v = action[n] if len(np.shape(action)) > 1 else action
+                            alpha[n] = (a_v + 1) / 2.0 if a_v is not None else 0.5
+                            p_tx[n, np.argmax(subband[n])] = (p_v + 1) / 2.0 * env.max_tx_power if p_v is not None else 0.5 * env.max_tx_power
+                        else:
+                            act = agent.select_micro_action_random(micro_state_list) if args.algo == 'random' else agent.select_micro_action_greedy(micro_state_list)
+                            alpha[n] = act[1]
+                            p_tx[n, np.argmax(subband[n])] = act[0] * env.max_tx_power
                 
                 micro_actions = {'p_tx': p_tx, 'alpha': alpha}
                 next_micro_state_list, rewards, done, info = env.step_micro(micro_actions, macro_actions)
@@ -161,29 +146,41 @@ def train(args):
                 
                 if args.algo == 'higat_masac':
                     # Add to micro replay buffer
-                    # Using dummy shapes for pipeline
-                    agent.micro_buffer.add(
-                        np.zeros(config['rl']['gat_embed_dim']),
-                        np.zeros(2),
-                        np.sum(rewards)/env.num_vehicles,
-                        np.zeros(config['rl']['gat_embed_dim']),
-                        0
-                    )
+                    sg = [t.to(agent.device) if t is not None else None for t in micro_state_list]
+                    nsg = [t.to(agent.device) if t is not None else None for t in next_micro_state_list]
+                    state_embeds = agent.micro_encoder(*sg).detach().cpu().numpy()
+                    next_state_embeds = agent.micro_encoder(*nsg).detach().cpu().numpy()
+                    for n in range(env.num_vehicles):
+                        agent.micro_buffer.add(
+                            state_embeds[n],
+                            np.array([p_val[n], alpha_val[n]]),
+                            rewards[n],
+                            next_state_embeds[n],
+                            done
+                        )
                     agent.train_micro()
                     
                 micro_state_list = next_micro_state_list
                 
             # After macro slot, add transition to macro buffer
             if args.algo == 'higat_masac':
+                msg = [t.to(agent.device) if t is not None else None for t in macro_state]
+                mnsg = [t.to(agent.device) if t is not None else None for t in env._get_macro_states()]
+                m_state_embeds = agent.macro_encoder(*msg).detach().cpu().numpy()
+                m_next_state = agent.macro_encoder(*mnsg).detach().cpu().numpy()
+                
+                global_state = np.mean(m_state_embeds, axis=0)
+                global_next_state = np.mean(m_next_state, axis=0)
                 agent.macro_buffer.add(
-                    np.zeros(config['rl']['gat_embed_dim']),
+                    global_state,
                     subband,
                     fmec,
                     np.sum(rewards)/env.num_vehicles,
-                    np.zeros(config['rl']['gat_embed_dim']),
-                    0
+                    global_next_state,
+                    done
                 )
                 agent.train_macro()
+                macro_state = env._get_macro_states()
         
         if args.algo == 'higat_masac' and episode % t_kd == 0:
             agent.knowledge_distillation()

@@ -132,16 +132,18 @@ class HiGAT_MASAC:
         self.micro_buffer = ReplayBuffer(config['rl']['buffer_size'], micro_state_dim, action_dim=micro_act_dim)
 
     def select_macro_action(self, state_graph):
-        state = self.macro_encoder(*state_graph).detach() # pool if needed, handle properly in train.py
+        sg = [t.to(self.device) if t is not None else None for t in state_graph]
+        state = self.macro_encoder(*sg).detach() # pool if needed, handle properly in train.py
         with torch.no_grad():
             subband, fmec, _, _ = self.macro_actor.sample(state)
         return subband.cpu().numpy().squeeze(0), fmec.cpu().numpy().squeeze(0)
         
     def select_micro_action(self, state_graph):
-        state = self.micro_encoder(*state_graph).detach()
+        sg = [t.to(self.device) if t is not None else None for t in state_graph]
+        state = self.micro_encoder(*sg).detach()
         with torch.no_grad():
             action, _, _ = self.micro_actor.sample(state)
-        return action.cpu().numpy().squeeze(0)
+        return action.cpu().numpy()
         
     def train_macro(self):
         if self.macro_buffer.size < self.batch_size:

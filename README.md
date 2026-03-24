@@ -6,9 +6,13 @@ Hierarchical Graph Attention Multi-Agent Soft Actor-Critic for Joint Resource Op
 Urban vehicular networks in the B5G/6G era must simultaneously satisfy three tightly coupled resource demands: spectrum efficiency, energy efficiency, and computation offloading. This project implements a hierarchical MARL architecture using GAT to encode interference topology and continuous/hybrid SAC algorithms to allocate power, spectrum subbands, and computational MEC resources.
 
 ## Project Structure
-- `env/`: Vehicular Environment (Channel, Task generation, Manhattan Mobility)
+- `env/`: OpenGym-compatible Vehicular Simulator
+  - `channel_model.py`: 3GPP UMi Path Loss, Shadowing, and Fast Fading
+  - `task_model.py`: MEC workload generator and Delay/Energy trackers
+  - `sumo_interface.py`: 9-block Manhattan Grid mobility generator
+  - `vehicular_env.py`: The core two-timescale Dec-POMDP orchestrator
 - `models/`: PyTorch modules (GAT Encoder, Micro SAC, Macro SAC, HiGAT MASAC Integrator)
-- `baselines/`: Benchmark models (Random, Greedy)
+- `baselines/`: Benchmark models (Random, Greedy, MAPPO, MADDPG, GNN-DDQN)
 - `configs/`: YAML Configuration parameters for the RL pipeline
 - `results/`: Training artifacts, metrics, and plots
 
