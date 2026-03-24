@@ -1,0 +1,51 @@
+\section{System Model and Problem Formulation}
+\label{sec:model}
+
+\subsection{Network Topology and Scenario}
+We consider a Beyond 5G (B5G) urban vehicular network operating within a standardized Manhattan Grid mobility scenario. The infrastructure comprises a set of $\mathcal{M} = \{1, 2, \dots, M\}$ Roadside Units (RSUs), each co-located with a Multi-Access Edge Computing (MEC) server to facilitate rapid computation offloading. A dynamic set of $\mathcal{N} = \{1, 2, \dots, N\}$ vehicles traverse the coverage area. To support communication, the system grants $\mathcal{K} = \{1, 2, \dots, K\}$ orthogonal spectrum sub-bands, each with bandwidth $B$. Vehicles utilize Vehicle-to-Infrastructure (V2I) links to upload computational tasks to the RSU MEC servers, while Vehicle-to-Vehicle (V2V) links enable direct localized data sharing. To maximize spectral efficiency, V2V links underlay the V2I communications, reusing the available sub-bands. This aggressive spectrum reuse induces critical inter-vehicle interference, which necessitates precise topological modeling.
+
+\subsection{Wireless Channel and Interference Model}
+The wireless channel between any transmitter and receiver relies on the 3rd Generation Partnership Project (3GPP) Urban Micro (UMi) propagation model (TR 38.901). The channel gain $g_{i,j}$ from node $i$ to node $j$ encapsulates path loss, log-normal shadowing (with standard deviation $\sigma_{sf}$), and fast fading. Specifically, V2I links (typically Line-of-Sight) experience Rician fading, whereas V2V links (often Non-Line-of-Sight) are subject to Rayleigh fading constraints. 
+
+When vehicle $n$ transmits on sub-band $k$ with continuous transmit power $p_{n,k} \in [0, P_{\max}]$, the Signal-to-Interference-plus-Noise Ratio (SINR) measured at the receiving RSU $m$ is given by:
+\begin{equation}
+    \gamma_{n,m}^k = \frac{p_{n,k} g_{n,m}}{\sum_{n' \in \mathcal{N} \setminus \{n\}} x_{n',k} p_{n',k} g_{n',m} + \sigma^2},
+\end{equation}
+where $\sigma^2$ denotes the local additive white Gaussian noise power variance, and $x_{n,k} \in \{0, 1\}$ is the binary sub-band allocation indicator assigning sub-band $k$ to vehicle $n$. The corresponding V2I achievable uplink data rate is subsequently determined by Shannon's capacity $R_n = B \log_2(1 + \gamma_{n,m}^k)$. 
+
+\subsection{Computation Task Model}
+During each operational epoch, each vehicle $n$ generates a computationally intensive task modeled as a tuple $D_n = \{d_n, c_n, T^{\max}_n\}$, where $d_n$ represents the total data size (in bits), $c_n$ defines the required CPU cycles to process a single bit, and $T^{\max}_n$ is the strict maximum allowable delay. 
+
+We embrace a partial offloading paradigm. Vehicle $n$ determines a continuous offloading ratio $\alpha_n \in [0, 1]$, designating $\alpha_n d_n$ bits to be offloaded to the MEC server, while locally executing the remaining $(1 - \alpha_n) d_n$ bits onboard through its local CPU operating at frequency $f_{loc}$. 
+
+\subsection{Latency and Energy Models}
+The execution architecture is highly parallelized. The local computation latency required to process the onboard data fraction operates synchronously with the MEC offloading cycle. The local processing time is simply:
+\begin{equation}
+    T_n^{local} = \frac{(1 - \alpha_n) d_n c_n}{f_{loc}}.
+\end{equation}
+
+Conversely, the MEC offloading latency $T_n^{offload}$ accumulates the wireless transmission delay and the remote MEC execution delay:
+\begin{equation}
+    T_n^{offload} = \frac{\alpha_n d_n}{R_n} + \frac{\alpha_n d_n c_n}{f_{n,m}},
+\end{equation}
+where $f_{n,m}$ is the fraction of edge CPU capacity dynamically allocated to vehicle $n$ by RSU $m$. Thus, the aggregate task completion delay becomes the bottleneck of both parallel paths $T_n = \max(T_n^{local}, T_n^{offload})$.
+
+Simultaneously, the total energy payload $E_n$ is the sum of the physical transmission energy consumed during the V2I uplink process and the internal energy dissipated by the local CPU architecture:
+\begin{equation}
+    E_n = \left( p_{n,k} \cdot \frac{\alpha_n d_n}{R_n} \right) + \kappa f_{loc}^2 (1 - \alpha_n) d_n c_n,
+\end{equation}
+with $\kappa$ operating as the chip architecture's effective switched capacitance coefficient.
+
+\subsection{Problem Formulation}
+The holistic objective of the system is to jointly minimize total latency and energy expenditures while amplifying the V2I network's sum-rate capacity. We formulate the optimization challenge as:
+\begin{align}
+    \min_{\mathbf{X}, \mathbf{P}, \boldsymbol{\alpha}, \mathbf{F}} \quad & \sum_{n=1}^N \left[ \omega_1 T_n + \omega_2 E_n - \omega_3 R_n \right] \label{eq:obj} \\
+    \text{s.t.} \quad & \sum_{k=1}^K x_{n,k} \leq 1, \quad \forall n \in \mathcal{N}, \label{c1} \\
+    & 0 \leq p_{n,k} \leq P_{\max}, \quad \forall n \in \mathcal{N}, k \in \mathcal{K}, \label{c2} \\
+    & 0 \leq \alpha_n \leq 1, \quad \forall n \in \mathcal{N}, \label{c3} \\
+    & \sum_{n \in \mathcal{C}_m} f_{n,m} \leq F_{MEC}, \quad \forall m \in \mathcal{M}, \label{c4} \\
+    & T_n \leq T^{\max}_n, \quad \forall n \in \mathcal{N}. \label{c5}
+\end{align}
+Here, weight vectors $\omega_1, \omega_2, \omega_3$ permit targeted administrative calibration between the conflicting sub-goals. Constraint (\ref{c1}) ensures each vehicle natively utilizes a maximal singular sub-band configuration. Constraints (\ref{c2}) and (\ref{c3}) bind the continuous power and split-offloading thresholds. Constraint (\ref{c4}) anchors the total computational loads allocated atop each MEC interface $\mathcal{C}_m$ against max capabilities $F_{MEC}$, whilst Eq. (\ref{c5}) bounds execution anomalies strictly below hardware timeouts. 
+
+This formulated minimization poses a Non-deterministic Polynomial-time (NP)-hard Mixed-Integer Non-Linear Programming (MINLP) problem. Due to the high mobility dimensionality defining urban vehicular states, deploying traditional centralized mathematical solvers is strictly unfeasible. To facilitate computationally tractable coordination matching milliseconds-scale coherence epochs, we ultimately reformulate the challenge as an expandable Decentralized Partially Observable Markov Decision Process (Dec-POMDP) for integration via our hierarchical multi-agent reinforcement mechanics.

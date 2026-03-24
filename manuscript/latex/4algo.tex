@@ -1,0 +1,46 @@
+\section{Proposed HiGAT-MASAC Framework}
+\label{sec:algo}
+
+\subsection{Hierarchical Architecture Overview}
+To effectively decompose the NP-hard resource allocation problem defined in Eq.~(\ref{eq:obj}), we propose a two-tier Hierarchical Graph Attention Multi-Agent Soft Actor-Critic (HiGAT-MASAC) architecture. This dual-timescale framework strictly separates macroscopic infrastructure resource provisioning from microscopic vehicular executions. At the macro-level (e.g., every $100$ ms), RSU agents perceive the global urban cluster topologies to safely partition orthogonal spectrum sub-bands and allocate respective MEC computing fractions. These "resource envelopes" are then broadcasted to their associated vehicles. Consecutively, at the fast micro-level (e.g., every $10$ ms), individual vehicles inherently observe their respective interference proximities and the received macro-envelopes to dynamically tune their partial continuous offloading ratios and transmit powers. This hierarchical decomposition massively reduces the exponential state-action exploration space encountered by standard flat-MARL networks, ensuring rapid convergence scalability. 
+
+\subsection{Topological Graph Construction}
+Unlike traditional autonomous agents that utilize dimensionally flat matrices to observe their neighborhoods, HiGAT-MASAC intrinsically maps the vehicular layout into spatial interference graphs $\mathcal{G} = (\mathcal{V}, \mathcal{E})$. 
+
+For the macro-level RSU agent $m$, the graph $\mathcal{G}_m^{mac}$ encapsulates all associated vehicles $n \in \mathcal{C}_m$. The node features capture essential physical and computational states $\mathbf{x}_n^{mac} = [g_{n,m}, d_n, c_n, v_n^x, v_n^y]$, representing V2I channel gain, task data size, CPU intensity, and 2D Cartesian velocity vectors respectively. Edges $\mathcal{E}^{mac}$ are established between vehicle pairs lying within a critical interference threshold $d_{int}$. 
+
+Correspondingly, at the micro-level, each vehicle observes a localized subgraph $\mathcal{G}_n^{mic}$. The node features natively incorporate the newly generated constraints from the macro-agent's envelope $\mathbf{x}_n^{mic} = [g_{n,m}, d_n, k_n^*, f_{n,m}]$, where $k_n^*$ represents the allocated sub-band and $f_{n,m}$ is the continuous MEC capacity fraction granted.
+
+\subsection{Graph Attention Network (GAT) Encoding}
+To empower the reinforcement learning algorithms with structural interference awareness universally, we map these spatial graphs through a Multi-Head Graph Attention Network (GAT). For a given node feature vector $\mathbf{x}_n$, the aggregated embedding $\mathbf{z}_n$ via $H$ parallel attention heads is computed as:
+\begin{equation}
+    \mathbf{z}_n = \mathop{\parallel}\limits_{h=1}^H \sigma \left( \sum_{n' \in \mathcal{N}(n)} \alpha_{n,n'}^h \mathbf{W}^h \mathbf{x}_{n'} \right),
+\end{equation}
+where $\sigma(\cdot)$ denotes the nonlinear ELU activation, $\mathbf{W}^h$ is a learnable linear transformation matrix, and $\alpha_{n,n'}^h$ signifies the normalized attention coefficient reflecting the asymmetric interference severity between vehicle $n$ and neighbor $n'$:
+\begin{equation}
+    \alpha_{n,n'}^h = \text{softmax}_{n'} \left( \text{LeakyReLU} \left( \mathbf{a}^{h\top} [\mathbf{W}^h \mathbf{x}_n \parallel \mathbf{W}^h \mathbf{x}_{n'}] \right) \right).
+\end{equation}
+This specific attention mechanism securely enables HiGAT-MASAC to blindly generalize resource management decisions regardless of unfamiliar or dense urban clustering configurations.
+
+\subsection{Macro-Level SAC Formulation}
+The RSU macro-agent dynamically administers spectrum and MEC assignments modeled as a localized Markov Decision Process defined by the tuple $\langle \mathcal{S}^{mac}, \mathcal{A}^{mac}, P, \mathcal{R}^{mac}, \gamma \rangle$.
+\begin{itemize}
+    \item \textbf{State} $\mathbf{s}^{mac} \in \mathcal{S}^{mac}$: The pooled state is the global mean aggregation $\frac{1}{|\mathcal{C}_m|}\sum_{n} \mathbf{z}_n^{mac}$ of all target node embeddings derived directly from the macro GAT encoder.
+    \item \textbf{Action} $\mathbf{a}^{mac} \in \mathcal{A}^{mac}$: The macro actor network outputs the continuous MEC allocations $f_{n,m}$, and uniquely utilizes a Gumbel-Softmax discrete relaxation layer to output the distinct combinatorial sub-band binary matching vectors $x_{n,k}$.
+    \item \textbf{Reward} $r^{mac}$: The centralized RSU aggregates the global objective tracking $r^{mac} = \sum_n (- \omega_1 T_n + \omega_3 R_n - \mu \cdot \mathcal{I}_{vio})$, emphasizing system sum-rate limits alongside strict penalty coefficients $\mu$ for any hard-delay violations $\mathcal{I}_{vio}$.
+\end{itemize}
+
+\subsection{Micro-Level SAC Formulation}
+Similarly, the underlying operational vehicle micro-agents coordinate local optimization tasks utilizing localized Dec-POMDP parameters.
+\begin{itemize}
+    \item \textbf{State} $\mathbf{s}^{mic}_n$: Each vehicle strictly monitors its native unpooled GAT subgraph embedding $\mathbf{z}_n^{mic}$.
+    \item \textbf{Action} $\mathbf{a}^{mic}_n$: The bounding continuous values directly map to the transmission power scalar $p_{n,k}$ and the partial task offloading ratio $\alpha_n$.
+    \item \textbf{Reward} $r^{mic}_n$: The natively decentralized micro-reward strictly isolates individual utility tracking $r^{mic}_n = - \omega_1 T_n - \omega_2 E_n + \omega_3 R_n$, steering vehicles towards selfish latency-energy Pareto equilibriums bounded securely by the overarching RSU macro-envelopes.
+\end{itemize}
+
+\subsection{Training Mechanism}
+We architect the overarching dual-timescale coordination loop harnessing the Centralized Training Decentralized Execution (CTDE) paradigm. During training, SAC critics intrinsically access global environment states across both tiers to securely bridge macroscopic intentions with microscopic constraints. To circumvent deterministic stagnation within the massive continuous resource space naturally prone to local optimum traps, our framework operates maximizing the maximum-entropy reinforcement objective:
+\begin{equation}
+    J(\pi) = \mathbb{E}_{\pi} \left[ \sum_t \gamma^t \left( r_t + \beta \mathcal{H}(\pi(\cdot | s_t)) \right) \right],
+\end{equation}
+where the auto-tuned temperature parameter $\beta$ balances stability alongside twin Q-critics $\min(Q_1, Q_2)$ combating overestimation bias. Finally, to rapidly bootstrap multi-tier awareness, HiGAT-MASAC structurally employs periodic parameter knowledge distillation, aligning the congruent multi-layer perceptron weights across the micro and macro GAT feature extractor blocks inherently.
