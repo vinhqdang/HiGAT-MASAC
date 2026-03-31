@@ -23,12 +23,12 @@ ALGOS_MAIN = ['higat_masac', 'mappo', 'maddpg', 'gnn_ddqn']
 def run(algo, seed, overrides=None, out_prefix=''):
     """Run a single train.py experiment if result doesn't exist."""
     tag = f"{out_prefix}_{algo}_seed_{seed}" if out_prefix else f"{algo}_seed_{seed}"
-    path = f"results/{tag}_metrics.json"
+    path = f"results/higat_masac/{tag}_metrics.json"
     if os.path.exists(path):
         print(f"  [SKIP] {path} already exists")
         return
 
-    cmd = f"conda run -n py313 python train.py --algo {algo} --seed {seed}"
+    cmd = f"conda run -n py313 python algorithms/higat_masac/train.py --algo {algo} --seed {seed}"
     if overrides:
         cmd += " --override " + " ".join(overrides)
     if out_prefix:
@@ -42,7 +42,7 @@ def load_metrics(tag):
     """Load metrics JSON for a given tag (prefix_algo_seedN or algo_seedN)."""
     d_vals, e_vals, t_vals = [], [], []
     for seed in SEEDS:
-        path = f"results/{tag}_seed_{seed}_metrics.json"
+        path = f"results/higat_masac/{tag}_seed_{seed}_metrics.json"
         if os.path.exists(path):
             with open(path) as f:
                 data = json.load(f)
@@ -71,10 +71,10 @@ def save_bar_chart(title, filename, labels, delay_m, delay_s, energy_m, energy_s
         ax[i].set_xticklabels(labels, rotation=45, ha='right')
         ax[i].set_ylabel(ylabel)
     plt.tight_layout()
-    os.makedirs('results/plots', exist_ok=True)
-    plt.savefig(f'results/plots/{filename}')
+    os.makedirs('results/higat_masac/plots', exist_ok=True)
+    plt.savefig(f'results/higat_masac/plots/{filename}')
     plt.close()
-    print(f"  Saved: results/plots/{filename}")
+    print(f"  Saved: results/higat_masac/plots/{filename}")
 
 def save_line_chart(title, filename, x_vals, x_label, series_dict):
     """series_dict: {label: {'delay': [...], 'energy': [...], 'throughput': [...]}}"""
@@ -90,10 +90,10 @@ def save_line_chart(title, filename, x_vals, x_label, series_dict):
         ax[i].set_ylabel(ylabel)
         ax[i].legend(fontsize=7)
     plt.tight_layout()
-    os.makedirs('results/plots', exist_ok=True)
-    plt.savefig(f'results/plots/{filename}')
+    os.makedirs('results/higat_masac/plots', exist_ok=True)
+    plt.savefig(f'results/higat_masac/plots/{filename}')
     plt.close()
-    print(f"  Saved: results/plots/{filename}")
+    print(f"  Saved: results/higat_masac/plots/{filename}")
 
 
 # ─────────────────────────────────────────────
@@ -225,7 +225,7 @@ def main():
                         help='Which scenarios to run (default: all)')
     args = parser.parse_args()
 
-    os.makedirs('results', exist_ok=True)
+    os.makedirs('results/higat_masac', exist_ok=True)
 
     scenario_map = {
         's1': run_s1, 's2': run_s2, 's3': run_s3,
@@ -234,7 +234,7 @@ def main():
     for s in args.scenarios:
         scenario_map[s]()
 
-    print("\n=== All scenarios complete! Figures saved to results/plots/ ===")
+    print("\n=== All scenarios complete! Figures saved to results/higat_masac/plots/ ===")
 
 
 if __name__ == '__main__':

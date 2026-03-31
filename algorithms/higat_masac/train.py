@@ -10,16 +10,16 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-from env.vehicular_env import VehicularEnv
-from models.higat_masac import HiGAT_MASAC
-from baselines.random_greedy import RandomGreedyBaseline
-from baselines.mappo import MAPPOAgent
-from baselines.maddpg import MADDPGAgent
-from baselines.gnn_ddqn import GNNDDQNAgent
+from common.env.vehicular_env import VehicularEnv
+from algorithms.higat_masac.models.higat_masac import HiGAT_MASAC
+from common.baselines.random_greedy import RandomGreedyBaseline
+from common.baselines.mappo import MAPPOAgent
+from common.baselines.maddpg import MADDPGAgent
+from common.baselines.gnn_ddqn import GNNDDQNAgent
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='configs/default.yaml', help='Path to config file')
+    parser.add_argument('--config', type=str, default='common/configs/default.yaml', help='Path to config file')
     parser.add_argument('--algo', type=str, default='higat_masac', choices=['higat_masac', 'random', 'greedy', 'mappo', 'maddpg', 'gnn_ddqn'])
     parser.add_argument('--seed', type=int, default=42, help='Random seed for experiment')
     parser.add_argument('--test-env', action='store_true', help='Test environment step logic without training')
@@ -194,11 +194,11 @@ def train(args):
         
         # Save checkpoints or plot periodically...
         if episode > 0 and episode % eval_interval == 0 and args.algo == 'higat_masac':
-            os.makedirs('results/plots', exist_ok=True)
+            os.makedirs('results/higat_masac/plots', exist_ok=True)
             plt.plot(reward_history)
             plt.xlabel("Episode")
             plt.ylabel("Reward")
-            plt.savefig(f"results/plots/{args.algo}_seed_{args.seed}_reward_curve.png")
+            plt.savefig(f"results/higat_masac/plots/{args.algo}_seed_{args.seed}_reward_curve.png")
             plt.close()
             
     # Save final average metrics (last 3 episodes)
@@ -206,10 +206,10 @@ def train(args):
     avg_energy = np.mean(metrics_history['energy'][-3:])
     avg_throughput = np.mean(metrics_history['throughput'][-3:])
     
-    os.makedirs('results', exist_ok=True)
+    os.makedirs('results/higat_masac', exist_ok=True)
     prefix = getattr(args, 'out_prefix', '') or ''
     tag = f"{prefix}_{args.algo}_seed_{args.seed}" if prefix else f"{args.algo}_seed_{args.seed}"
-    with open(f'results/{tag}_metrics.json', 'w') as f:
+    with open(f'results/higat_masac/{tag}_metrics.json', 'w') as f:
         json.dump({
             'delay': float(avg_delay),
             'energy': float(avg_energy),

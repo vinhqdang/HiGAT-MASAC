@@ -11,7 +11,7 @@ def parse_args():
     return parser.parse_args()
 
 def plot_metrics(args):
-    os.makedirs('results/plots', exist_ok=True)
+    os.makedirs('results/higat_masac/plots', exist_ok=True)
     
     algorithms = ['higat_masac', 'mappo', 'maddpg', 'gnn_ddqn', 'random', 'greedy']
     
@@ -24,14 +24,14 @@ def plot_metrics(args):
     
     seeds = [42, 43, 44] if args.multi_seed else [42]
     
-    with open('results/evaluation_report.txt', 'w') as report:
+    with open('results/higat_masac/evaluation_report.txt', 'w') as report:
         report.write("HiGAT-MASAC Evaluation Results (Multi-Seed)\n")
         report.write("===========================================\n")
         
         for algo in algorithms:
             d_vals, e_vals, t_vals = [], [], []
             for seed in seeds:
-                filepath = f'results/{algo}_seed_{seed}_metrics.json'
+                filepath = f'results/higat_masac/{algo}_seed_{seed}_metrics.json'
                 if os.path.exists(filepath):
                     with open(filepath, 'r') as f:
                         data = json.load(f)
@@ -84,7 +84,7 @@ def plot_metrics(args):
     ax[2].set_ylabel('Mbps')
     
     plt.tight_layout()
-    plt.savefig('results/plots/primary_metrics.png')
+    plt.savefig('results/higat_masac/plots/primary_metrics.png')
     plt.close()
     
 
@@ -93,4 +93,4 @@ if __name__ == "__main__":
     
     print("Running evaluation plotting...")
     plot_metrics(args)
-    print("Check results/plots/ and results/evaluation_report.txt")
+    print("Check results/higat_masac/plots/ and results/higat_masac/evaluation_report.txt")
