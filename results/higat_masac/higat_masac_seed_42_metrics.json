@@ -1,0 +1,7 @@
+{
+  "delay_ms": 9660.828034580325,
+  "throughput_Mbps": 78.2819279698545,
+  "final_reward": 3708.75290369387,
+  "seed": 42,
+  "algo": "higat_masac"
+}

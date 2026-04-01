@@ -3,13 +3,13 @@
 
 env:
   num_rsus: 4
-  num_vehicles: 50
+  num_vehicles: 20
   num_subbands: 10
-  subband_bandwidth_mhz: 1.0 # B
+  subband_bandwidth_mhz: 20.0 # B — 20 MHz per subband (total 200 MHz across 10 bands)
   max_tx_power_dbm: 23 # P_max
   noise_power_dbm: -114 # σ²
   rsu_mec_capacity_ghz: 20.0 # F_mec
-  vehicle_cpu_capacity_ghz: 1.0 # f_loc
+  vehicle_cpu_capacity_ghz: 5.0 # f_loc — 5 GHz typical mobile SoC
   max_delay_ms: 100 # T_max
   sim_duration_s: 2.0 # Scale down from 600
   grid_size_blocks: 3 # 3x3 blocks, 250m each
@@ -18,10 +18,10 @@ env:
   num_lanes: 3
   
   # Task generation
-  task_data_mbits_min: 0.5
-  task_data_mbits_max: 2.0
-  task_cpu_cycles_per_bit_min: 500
-  task_cpu_cycles_per_bit_max: 1500
+  task_data_mbits_min: 0.1
+  task_data_mbits_max: 0.5
+  task_cpu_cycles_per_bit_min: 50
+  task_cpu_cycles_per_bit_max: 200
   
   # Channel
   shadowing_std_db: 4.0
@@ -51,7 +51,7 @@ rl:
   micro_slot_duration_ms: 10
   
   # Training params
-  training_episodes: 10 # Scale down from 2000
+  training_episodes: 200
   eval_interval: 2
   
   # KD params

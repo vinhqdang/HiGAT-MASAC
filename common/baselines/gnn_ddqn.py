@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from models.gat_encoder import GATEncoder
+from algorithms.higat_masac.models.gat_encoder import GATEncoder
 
 class GNNDDQNAgent:
     """

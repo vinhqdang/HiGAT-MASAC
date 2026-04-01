@@ -1,0 +1,7 @@
+{
+  "final_avg_return": 6131.226193287853,
+  "total_hfa_rounds": 541,
+  "total_drift_events": 1601,
+  "seed": 42,
+  "episodes": 50
+}

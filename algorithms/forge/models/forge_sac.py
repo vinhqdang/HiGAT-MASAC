@@ -203,11 +203,14 @@ class FORGE_SAC:
         x, edge_index, batch = self.pack_macro_graph(mac_state)
         with torch.no_grad():
             state_emb = self.macro_encoder(x, edge_index, batch=batch)
-            # Pool to a single RSU-level vector
             if state_emb.shape[0] > 1:
                 state_emb = state_emb.mean(0, keepdim=True)
-            subband, fmec, _, _ = self.macro_actor.sample(state_emb)
-        return subband.cpu().numpy().squeeze(0), fmec.cpu().numpy().squeeze(0)
+            subband, fmec_norm, _, _ = self.macro_actor.sample(state_emb)
+        subband_np = subband.cpu().numpy().squeeze(0)
+        # Scale sigmoid [0,1] fmec output to actual Hz
+        fmec_np = fmec_norm.cpu().numpy().squeeze(0) * self.config['env']['rsu_mec_capacity_ghz'] * 1e9
+        fmec_np = np.clip(fmec_np, 1e8, self.config['env']['rsu_mec_capacity_ghz'] * 1e9)
+        return subband_np, fmec_np
 
     def select_micro_action(self, micro_states, evaluate=False):
         """Returns action_np array for all vehicles from micro actor."""

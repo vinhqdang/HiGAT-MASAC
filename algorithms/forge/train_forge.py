@@ -68,11 +68,11 @@ def warmup_gmae(agents, env, warmup_steps, seed):
         K     = env.K
         dummy_macro = {
             'subbands':        np.eye(K)[np.random.choice(K, n_veh)],
-            'f_mec_allocated': np.random.uniform(0.1, 1.0, n_veh)
+            'f_mec_allocated': np.random.uniform(0.1, 1.0, n_veh) * env.f_mec  # Hz scale
         }
         dummy_micro = {
-            'p_tx':  np.random.uniform(0, env.max_tx_power, (n_veh, K)),
-            'alpha': np.random.uniform(0, 1, n_veh)
+            'p_tx':  np.random.uniform(env.max_tx_power*0.1, env.max_tx_power, (n_veh, K)),
+            'alpha': np.random.uniform(0.1, 0.9, n_veh)
         }
         _, _, _, _ = env.step_micro(dummy_micro, dummy_macro)
         env.mobility_model.step()
@@ -188,9 +188,10 @@ def main():
                 # ── Step 7: ACT (Micro) ─────────────────────────────────────
                 micro_actions_raw = agents[0].select_micro_action(micro_states)  # shared micro policy
 
-                # Map [-1,1] action to physical actions
-                p_tx  = ((micro_actions_raw[:, 0] + 1.0) / 2.0) * env.max_tx_power  # [0, P_max]
-                alpha = (micro_actions_raw[:, 1] + 1.0) / 2.0                       # [0, 1]
+                # Map [-1,1] tanh action to [0.05, 0.95] to avoid uplink/MEC edge cases
+                p_tx  = ((micro_actions_raw[:, 0] + 1.0) / 2.0) * env.max_tx_power
+                p_tx  = np.clip(p_tx, env.max_tx_power * 0.01, env.max_tx_power)
+                alpha = np.clip((micro_actions_raw[:, 1] + 1.0) / 2.0, 0.05, 0.95)
 
                 micro_actions = {
                     'p_tx':  np.tile(p_tx[:, None], (1, K)) / K,  # spread evenly across subbands
@@ -217,44 +218,36 @@ def main():
                 adapted_reward  = agents[0].erpg.get_reward(avg_delay, avg_energy, avg_throughput)
                 episode_return += adapted_reward
 
-                # ── Step 9: STORE ────────────────────────────────────────────
-                # Store a single macro embedding + average micro reward per agent
+                # ── Step 9: STORE (BATCHED) ──────────────────────────────────
                 for m, agent in enumerate(agents):
-                    macro_emb_np = macro_prev_emb[m].detach().cpu().numpy().squeeze(0)  # [embed_dim]
+                    macro_emb_np = macro_prev_emb[m].detach().cpu().numpy().squeeze(0)
 
-                    # Macro buffer: store (s, subband, fmec, r, s', done) with macro embeddings
+                    # Macro buffer
                     cluster_vehs = mac_state[m]['cluster_vehicles']
                     if len(cluster_vehs) > 0:
-                        sub_m  = macro_subband_all[cluster_vehs[0]]      # [K]
-                        sub_m  = np.eye(K)[np.argmax(sub_m)]            # one-hot [K]
+                        sub_m = np.eye(K)[np.argmax(macro_subband_all[cluster_vehs[0]])]
                         fmec_m = macro_fmec_all[cluster_vehs].mean()
-
-                        # Pad to fixed num_vehicles size
-                        sub_matrix  = np.zeros((num_vehicles, K))
-                        fmec_vec    = np.zeros(num_vehicles)
+                        sub_matrix = np.zeros((num_vehicles, K))
+                        fmec_vec   = np.zeros(num_vehicles)
                         for i, v in enumerate(cluster_vehs[:num_vehicles]):
-                            sub_matrix[i]  = sub_m
-                            fmec_vec[i]    = fmec_m
-
-                        r_cluster = float(np.mean(rewards[cluster_vehs]) if len(cluster_vehs) > 0 else adapted_reward)
+                            sub_matrix[i] = sub_m
+                            fmec_vec[i]   = fmec_m
+                        r_cluster = float(np.mean(rewards[cluster_vehs]))
                         agent.macro_buffer.add(macro_emb_np, sub_matrix, fmec_vec,
-                                               r_cluster, macro_emb_np, float(micro_step == env.micro_steps_per_macro - 1))
-
-                    # Micro buffer: store per-vehicle transitions
-                    for n in range(num_vehicles):
-                        x_micro, ei_micro = agent.pack_micro_graph([micro_states[n]])
-                        with torch.no_grad():
-                            micro_emb = agent.micro_encoder(x_micro, ei_micro)
-                        micro_emb_np = micro_emb[0].cpu().numpy()  # [embed_dim]
-
-                        x_micro_next, ei_next = agent.pack_micro_graph([next_micro_states[n]])
-                        with torch.no_grad():
-                            micro_emb_next = agent.micro_encoder(x_micro_next, ei_next)
-                        micro_emb_next_np = micro_emb_next[0].cpu().numpy()
-
-                        agent.micro_buffer.add(micro_emb_np, micro_actions_raw[n],
-                                               adapted_reward, micro_emb_next_np,
+                                               r_cluster, macro_emb_np,
                                                float(micro_step == env.micro_steps_per_macro - 1))
+
+                    # Micro buffer — ONE batched forward pass for all N vehicles
+                    x_all, ei_all = agent.pack_micro_graph(micro_states)
+                    with torch.no_grad():
+                        emb_all = agent.micro_encoder(x_all, ei_all).cpu().numpy()
+                    x_nxt, ei_nxt = agent.pack_micro_graph(next_micro_states)
+                    with torch.no_grad():
+                        emb_nxt = agent.micro_encoder(x_nxt, ei_nxt).cpu().numpy()
+                    done_flag = float(micro_step == env.micro_steps_per_macro - 1)
+                    for n in range(num_vehicles):
+                        agent.micro_buffer.add(emb_all[n], micro_actions_raw[n],
+                                               adapted_reward, emb_nxt[n], done_flag)
 
                 micro_states = next_micro_states
 
