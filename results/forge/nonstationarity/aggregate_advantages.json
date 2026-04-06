@@ -1,0 +1,14 @@
+{
+  "vehicle_surge": {
+    "tp_advantage_mbps": -23.064735895489378,
+    "vio_reduction": -0.2733583333333333
+  },
+  "channel_shift": {
+    "tp_advantage_mbps": -23.607548169775853,
+    "vio_reduction": -0.29790833333333333
+  },
+  "task_overload": {
+    "tp_advantage_mbps": -22.654322957954278,
+    "vio_reduction": -0.24960833333333338
+  }
+}

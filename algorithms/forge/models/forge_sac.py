@@ -45,16 +45,21 @@ class RingBuffer:
     def sample(self, batch_size):
         if len(self.buffer) == 0:
             return []
+        
+        n_samples = min(batch_size, len(self.buffer))
         xis = np.array([item[1] for item in self.buffer], dtype=np.float64)
-        xis = np.clip(xis, 0, None)   # remove any negatives
+        xis = np.clip(xis, 0, None)
+        
         total = xis.sum()
-        if total <= 0:
+        non_zero_count = np.count_nonzero(xis)
+        
+        if total <= 0 or non_zero_count < n_samples:
             probs = np.ones(len(self.buffer)) / len(self.buffer)
         else:
             probs = xis / total
 
         indices = np.random.choice(
-            len(self.buffer), min(batch_size, len(self.buffer)),
+            len(self.buffer), n_samples,
             p=probs, replace=False
         )
         return [self.buffer[i] for i in indices]
@@ -75,6 +80,10 @@ class FORGE_SAC:
         critic_lr  = config['rl']['critic_lr']
         self.batch_size = config['rl']['batch_size']
         self.lambda_mem = 0.5  # Weight for GMAE memory replay loss
+
+        # Ablation flags
+        self.use_cpd  = config.get('ablation', {}).get('use_cpd', True)
+        self.use_erpg = config.get('ablation', {}).get('use_erpg', True)
 
         num_vehicles_max = config['env']['num_vehicles']
         num_subbands     = config['env']['num_subbands']
@@ -231,6 +240,9 @@ class FORGE_SAC:
 
         # Forward GMAE
         loss_gmae, xi, z_pool = self.gmae_cpd(x, edge_index)
+
+        if not self.use_cpd:
+            return "no_drift", loss_gmae, torch.tensor(0.0, device=self.device)
 
         # Update NBOCD with detached signals (separate computation graph)
         cp_prob, r_hat, loss_tcn = self.nbocd.update(xi.detach(), z_pool.detach())

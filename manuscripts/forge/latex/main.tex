@@ -1,0 +1,51 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{FORGE: Federated Online Reinforcement Graph Evolution for Non-Stationary B5G/6G Vehicular Networks}
+
+\author{D.Q. Vinh,~\IEEEmembership{Student Member,~IEEE}
+\thanks{The authors are with the Faculty of Engineering, BUV, Vietnam. (e-mail: vinh.dq4@buv.edu.vn)}}
+
+\maketitle
+
+\begin{abstract}
+Next-generation vehicular networks (B5G/6G) face unprecedented non-stationarity due to rapid topology changes and varying multi-modal traffic patterns. Conventional deep reinforcement learning (DRL) agents often fail to adapt to such distributional shifts, leading to significant performance degradation. This paper proposes FORGE (Federated Online Reinforcement Graph Evolution), a novel framework that integrates Graph Masked Autoencoders (GMAE) with Bayesian Online Change-Point Detection (BOCD) to detect drift in graph-structured state spaces...
+\end{abstract}
+
+\begin{IEEEkeywords}
+Vehicular Networks, 6G, Federated Learning, Reinforcement Learning, Graph Neural Networks, Non-stationarity.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPAR_start{T}{he} rapid evolution of vehicular networks toward 6G has introduced...
+
+\section{System Model and Problem Formulation}
+We consider a vehicular network consisting of $M$ RSUs and $N$ vehicles...
+
+\section{Proposed Framework: FORGE}
+The FORGE framework consists of three primary components:
+\subsection{Drift Detection via GMAE-CPD}
+\subsection{Evolutive Reward & Pseudo-label Generator (ERPG)}
+\subsection{Hierarchical Federated Aggregation (HFA)}
+
+\section{Experimental Results}
+\subsection{Stationary Performance Benchmarks}
+\subsection{Robustness to Environmental Drift}
+\subsection{Ablation Study}
+\subsection{Scalability Analysis}
+
+\section{Conclusion}
+In this paper, we presented FORGE...
+
+\bibliographystyle{IEEEtran}
+\bibliography{ref}
+
+\end{document}

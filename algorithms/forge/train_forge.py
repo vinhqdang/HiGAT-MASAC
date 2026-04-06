@@ -43,6 +43,11 @@ def parse_args():
     p.add_argument('--warmup',    type=int, default=200, help='GMAE warm-up steps')
     p.add_argument('--save-dir',  type=str, default='results/forge')
     p.add_argument('--eval-freq', type=int, default=10,  help='Eval every N episodes')
+    p.add_argument('--no-cpd',    action='store_true', help='Ablation: Disable drift detection')
+    p.add_argument('--no-erpg',   action='store_true', help='Ablation: Use static rewards')
+    p.add_argument('--no-hfa',    action='store_true', help='Ablation: Disable federated aggregation')
+    p.add_argument('--num-vehicles', type=int, default=None, help='Override number of vehicles')
+    p.add_argument('--no-plot',   action='store_true', help='Skip plotting inside train script')
     return p.parse_args()
 
 
@@ -99,6 +104,13 @@ def main():
     num_rsus    = env.num_rsus
     num_vehicles = env.num_vehicles
     K = env.K
+
+    # Apply ablation overrides to config
+    if 'ablation' not in config: config['ablation'] = {}
+    if args.no_cpd:  config['ablation']['use_cpd']  = False
+    if args.no_erpg: config['ablation']['use_erpg'] = False
+    if args.no_hfa:  config['ablation']['use_hfa']  = False
+    if args.num_vehicles:  config['env']['num_vehicles'] = args.num_vehicles
 
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(os.path.join(args.save_dir, 'plots'),      exist_ok=True)
@@ -209,13 +221,19 @@ def main():
                 avg_throughput = float(np.mean(info['throughputs']))
 
                 # ── Step 8: EVOLVE REWARD (ERPG) ────────────────────────────
-                for agent in agents:
-                    agent.erpg.update_history(avg_delay, avg_energy, avg_throughput)
-                    dw = agent.erpg.evolve_weights(agent.device)
+                use_erpg = config.get('ablation', {}).get('use_erpg', True)
+                if use_erpg:
+                    for agent in agents:
+                        agent.erpg.update_history(avg_delay, avg_energy, avg_throughput)
+                        dw = agent.erpg.evolve_weights(agent.device)
+                    dynamic_weights = agents[0].erpg.current_weights
+                    adapted_reward  = agents[0].erpg.get_reward(avg_delay, avg_energy, avg_throughput)
+                else:
+                    # Use fixed balanced weights [0.33, 0.33, 0.33]
+                    dynamic_weights = torch.tensor([0.33, 0.33, 0.33], device=agents[0].device)
+                    # Standard reward: -delay -energy + throughput (scaled)
+                    adapted_reward = -0.33 * avg_delay - 0.33 * avg_energy + 0.33 * avg_throughput
 
-                # Use agent 0's weights as canonical (they converge to similar values in practice)
-                dynamic_weights = agents[0].erpg.current_weights
-                adapted_reward  = agents[0].erpg.get_reward(avg_delay, avg_energy, avg_throughput)
                 episode_return += adapted_reward
 
                 # ── Step 9: STORE (BATCHED) ──────────────────────────────────
@@ -275,7 +293,7 @@ def main():
 
             # ── Step 12: FEDERATED AGGREGATION ──────────────────────────────
             any_hard = any(f in ("hard_drift", "structural_drift") for f in drift_flags)
-            if any_hard:
+            if any_hard and config.get('ablation', {}).get('use_hfa', True):
                 global_hfa_rounds += 1
 
                 macro_dicts = [a.get_state_dict()['macro_actor'] for a in agents]
@@ -318,6 +336,10 @@ def main():
     # ---------------------------------------------------------------------------
     # Save results and plots
     # ---------------------------------------------------------------------------
+    if args.no_plot:
+        print("Skipping plots as requested by --no-plot")
+        return
+
     plt.figure(figsize=(10, 4))
     plt.plot(return_history, label='Episode Return')
     plt.xlabel('Episode')
